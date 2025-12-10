@@ -3,8 +3,10 @@ import math
 
 
 def softmax(x: mx.array, axis: int) -> mx.array:
-    # TODO: manual implementation
-    return mx.softmax(x, axis=axis)
+    x_max = mx.max(x, axis=axis, keepdims=True)
+    x_stablized = x - x_max
+    exp_x = mx.exp(x_stablized)
+    return exp_x / mx.sum(exp_x, axis=axis, keepdims=True)
 
 
 def linear(
@@ -12,7 +14,9 @@ def linear(
     w: mx.array,
     bias: mx.array | None = None,
 ) -> mx.array:
-    pass
+    if bias:
+        return mx.addmm(bias, x, w.T)
+    return mx.matmul(x, w.T)
 
 
 def silu(x: mx.array) -> mx.array:

@@ -39,6 +39,10 @@ class SimpleMultiHeadAttention:
         self.wv = wv
         self.wo = wo
 
+    # 1. 映射得到三个矩阵
+    # 2. 对hidden_size 进行切分
+    # 3. 进行注意力运算，此时得到的注意力矩阵实际上也有多个头
+    # 4. 合并结果 并乘以Wo矩阵
     def __call__(
         self,
         query: mx.array,

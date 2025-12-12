@@ -81,7 +81,9 @@ class SimpleMultiHeadAttention:
 
 
 def causal_mask(L: int, S: int, dtype: mx.Dtype) -> mx.array:
-    pass
+    mask = mx.tril(mx.ones((L, S), dtype=dtype), k=(S - L))
+    mask_matrix = mx.where(mask > 0, mx.array(0), mx.array(-mx.inf)).astype(dtype)
+    return mask_matrix
 
 
 def scaled_dot_product_attention_grouped(
@@ -91,7 +93,45 @@ def scaled_dot_product_attention_grouped(
     scale: float | None = None,
     mask: mx.array | str | None = None,
 ) -> mx.array:
-    pass
+    *B, H_q, L_q, D_h = query.shape
+    *B, H, L_k, _ = key.shape
+    n_repeat = H_q // H
+
+    # 将 query 从 (*B, H_q, L_q, D_h) reshape 成 (*B, H, n_repeat, L_q, D_h)
+    # 这样 heads [0,1,2] 共享 key head 0, heads [3,4,5] 共享 key head 1, 等等
+    # 这里可以记住，reshape 18到 6,3时， 意思是把18变成6个3
+    query = query.reshape(*B, H, n_repeat, L_q, D_h)
+
+    # 将 key 和 value reshape 成 (*B, H, 1, L_k, D_h)
+    # 1 维度会在 matmul 时广播到 n_repeat，这里主要是因为广播是从右边开始广播的
+    key = key.reshape(*B, H, 1, L_k, D_h)
+    value = value.reshape(*B, H, 1, L_k, D_h)
+
+    # 计算 attention scores: (*B, H, n_repeat, L_q, D_h) @ (*B, H, 1, D_h, L_k)
+    # 结果: (*B, H, n_repeat, L_q, L_k)
+    out = mx.matmul(query, key.transpose(*range(key.ndim - 2), -1, -2))
+
+    if scale is None:
+        scale = mx.rsqrt(D_h)
+    out = out * scale
+
+    if isinstance(mask, str) and mask == "causal":
+        mask = causal_mask(L_q, L_k, mx.float32)
+    elif mask is not None:
+        # mask 从 (*B, H_q, L_q, L_k) reshape 到 (*B, H, n_repeat, L_q, L_k)
+        mask = mask.reshape(*B, H, n_repeat, L_q, L_k)
+
+    if mask is not None:
+        out += mask
+    scores = softmax(out, axis=-1)
+
+    # 计算输出: (*B, H, n_repeat, L_q, L_k) @ (*B, H, 1, L_k, D_h)
+    # 结果: (*B, H, n_repeat, L_q, D_h)
+    out = mx.matmul(scores, value)
+
+    # reshape 回原始形状: (*B, H, n_repeat, L_q, D_h) → (*B, H_q, L_q, D_h)
+    out = out.reshape(*B, H_q, L_q, D_h)
+    return out
 
 
 def flash_attention(

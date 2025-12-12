@@ -1,3 +1,5 @@
+import math
+from turtle import bk
 import mlx.core as mx
 from .basics import linear, silu
 from .attention import scaled_dot_product_attention_grouped
@@ -24,14 +26,57 @@ class Qwen2MultiHeadAttention:
         max_seq_len: int = 32768,
         theta: int = 1000000,
     ):
-        pass
+        self.max_seq_len = max_seq_len
+        self.num_heads = num_heads
+        self.num_kv_heads = num_kv_heads
+        self.hidden_size = hidden_size
+        self.theta = theta
+        self.head_dim = self.hidden_size // self.num_heads
+        self.scale = mx.rsqrt(self.head_dim)
+        self.rope = RoPE(self.head_dim, max_seq_len, theta)
+        self.wq = wq
+        self.wk = wk
+        self.wv = wv
+        self.wo = wo
+        self.bq = bq
+        self.bk = bk
+        self.bv = bv
 
     def __call__(
         self,
         x: mx.array,
         mask: mx.array | str | None = None,
     ) -> mx.array:
-        pass
+        *B, L, _ = x.shape
+        q, k, v = (
+            linear(x, self.wq, self.bq),
+            linear(x, self.wk, self.bk),
+            linear(x, self.wv, self.bv),
+        )
+        q = q.reshape(*B, L, self.num_heads, self.head_dim)
+        k = k.reshape(*B, L, self.num_kv_heads, self.head_dim)
+        v = v.reshape(*B, L, self.num_kv_heads, self.head_dim)
+        q = self.rope(
+            q,
+            slice(0, L),
+        )
+        k = self.rope(
+            k,
+            slice(0, L),
+        )
+        q = q.transpose(0, 2, 1, 3)
+        k = k.transpose(0, 2, 1, 3)
+        v = v.transpose(0, 2, 1, 3)
+
+        out = scaled_dot_product_attention_grouped(
+            q.astype(mx.float32),
+            k.astype(mx.float32),
+            v.astype(mx.float32),
+            scale=self.scale,
+            mask=mask,
+        ).astype(x.dtype)
+        out = out.transpose(0, 2, 1, 3).reshape(*B, L, self.hidden_size)
+        return linear(out, self.wo)
 
 
 class Qwen2MLP:

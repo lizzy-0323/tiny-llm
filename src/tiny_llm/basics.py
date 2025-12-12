@@ -14,7 +14,7 @@ def linear(
     w: mx.array,
     bias: mx.array | None = None,
 ) -> mx.array:
-    if bias:
+    if bias is not None:
         return mx.addmm(bias, x, w.T)
     return mx.matmul(x, w.T)
 

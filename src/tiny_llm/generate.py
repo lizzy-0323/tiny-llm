@@ -26,8 +26,8 @@ def simple_generate(
             break
         tokenized_prompt.append(next_token)
         detokenizer.add_token(next_token)
-
-    print(detokenizer.text)
+        print(detokenizer.text, end="", flush=True)
+        detokenizer.reset()
 
 
 def log_sum_exp(x: mx.array):

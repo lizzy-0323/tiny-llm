@@ -216,7 +216,7 @@ class Qwen2ModelWeek1:
         inputs: mx.array,
     ) -> mx.array:
         # 1. embedding
-        output = self.embedding(inputs)
+        output = self.embedding(inputs)[None]
         # 2. transformer blocks
         for layer in self.layers_inner:
             output = layer(output, mask="causal")

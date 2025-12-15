@@ -1,5 +1,4 @@
 import math
-from turtle import bk
 import mlx.core as mx
 from .basics import linear, silu
 from .attention import scaled_dot_product_attention_grouped
@@ -88,10 +87,20 @@ class Qwen2MLP:
         w_up: mx.array,
         w_down: mx.array,
     ):
-        pass
+        self.w_gate = w_gate
+        self.w_up = w_up
+        self.w_down = w_down
+        self.hidden_dim = hidden_dim
+        self.dim = dim
 
     def __call__(self, x: mx.array) -> mx.array:
-        pass
+        gate_projection = linear(x, self.w_gate)  # gate 分支
+        up_projection = linear(x, self.w_up)  # up 分支
+
+        # SwiGLU: silu(gate) * up
+        activated = silu(gate_projection) * up_projection
+
+        return linear(activated, self.w_down)
 
 
 class Qwen2TransformerBlock:

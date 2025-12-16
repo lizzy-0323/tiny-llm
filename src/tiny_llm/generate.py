@@ -26,16 +26,7 @@ def simple_generate(
             break
         tokenized_prompt.append(next_token)
         detokenizer.add_token(next_token)
-        print(detokenizer.text, end="", flush=True)
-        detokenizer.reset()
-
-
-def log_sum_exp(x: mx.array):
-    a = mx.max(x)
-    e_x_minus_a = (x - a).exp()
-    sum_exp = e_x_minus_a.sum(dim=1, keepdims=True)
-    log_sum_exp = sum_exp.log()
-    return a + log_sum_exp
+        print(detokenizer.last_segment, end="", flush=True)
 
 
 def simple_generate_with_kv_cache(
